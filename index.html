@@ -595,37 +595,48 @@ function getRecentHistory(archive) {
 }
 
 // ─── RSS feed fetching ────────────────────────────────────────────────────────
-// GDELT — Global Database of Events, Language and Tone
-// Explicitly CORS-enabled, no API key, indexes thousands of global news sources
-const GDELT_QUERIES = [
-  { name: 'Geopolitics & Travel',     q: 'geopolitics travel tourism' },
-  { name: 'Conflict & Destinations',  q: 'conflict tourism borders destination' },
-  { name: 'World Politics',           q: 'diplomacy sanctions war peace travel' },
-];
-
-async function fetchGDELT(query) {
-  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query.q)}&mode=artlist&format=json&maxrecords=8&timespan=3d&sort=DateDesc`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 9000);
+// Multiple public news APIs with CORS support — no API key needed
+async function fetchDevTo() {
+  const url = 'https://dev.to/api/articles?state=fresh&tags=travel,geopolitics,culture&limit=10&sort_by=published_at';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
-    const resp = await fetch(url, { signal: controller.signal });
+    const r = await fetch(url, { signal: ctrl.signal });
     clearTimeout(timer);
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    if (!data.articles?.length) return null;
-    const items = data.articles.slice(0, 7).map(a => ({
-      title: a.title?.trim(),
-      blurb: a.domain || '',
-    })).filter(i => i.title);
-    return items.length ? { name: query.name, items } : null;
-  } catch (_) {
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data?.length) return null;
+    const items = data.slice(0, 8).map(a => ({ title: a.title?.trim(), blurb: a.description?.trim() || '' })).filter(i => i.title);
+    return items.length ? { name: 'Dev.to (Culture & Travel)', items } : null;
+  } catch (_) { clearTimeout(timer); return null; }
+}
+
+async function fetchHackerNews() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=20', { signal: ctrl.signal });
     clearTimeout(timer);
-    return null;
-  }
+    if (!r.ok) return null;
+    const ids = await r.json();
+    if (!ids?.length) return null;
+    const items = [];
+    for (const id of ids.slice(0, 8)) {
+      try {
+        const ir = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { signal: ctrl.signal });
+        if (ir.ok) {
+          const item = await ir.json();
+          if (item?.title) items.push({ title: item.title.trim(), blurb: '' });
+        }
+      } catch(_) {}
+      if (items.length >= 8) break;
+    }
+    return items.length ? { name: 'Hacker News (Tech & Society)', items } : null;
+  } catch (_) { clearTimeout(timer); return null; }
 }
 
 async function fetchRSSFeeds() {
-  const settled = await Promise.allSettled(GDELT_QUERIES.map(fetchGDELT));
+  const settled = await Promise.allSettled([fetchDevTo(), fetchHackerNews()]);
   return settled.map(r => r.value).filter(Boolean);
 }
 
