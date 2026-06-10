@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Meridian — Editorial Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,900;1,400&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin=""></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin=""></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- Load WebLLM as ES module, expose globally -->
+<script type="module">
+  import * as WebLLM from "https://esm.run/@mlc-ai/web-llm";
+  window._WebLLM = WebLLM;
+  document.dispatchEvent(new CustomEvent('webllm-ready'));
+</script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg1:#111820;--bg2:#141b22;--bg3:#1a2332;
+  --text:#f5f0e8;--muted:#7a7570;--dim:#3a3530;
+  --amber:#d4a853;--amber2:#9a7a3a;--amber3:#5a4820;
+  --border:#1e2832;--border2:#253040;
+  --green:#4a9c6d;--green2:#2a5c3d;
+  --red:#c0392b;--red2:#7a2020;
+}
+html,body{background:var(--bg);color:var(--text);min-height:100vh;font-family:'Source Serif 4',serif}
+button{cursor:pointer;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;border:none;outline:none}
+textarea,input,select{font-family:'IBM Plex Mono',monospace;background:var(--bg1);color:var(--text);border:1px solid var(--border2);border-radius:4px;outline:none}
+textarea:focus,input:focus,select:focus{border-color:var(--amber2)}
+select option{background:var(--bg2)}
+.app{max-width:1100px;margin:0 auto;padding:0 24px 80px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;padding:28px 0 20px;border-bottom:1px solid var(--border)}
+.logo{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;letter-spacing:-.02em}
+.logo span{color:var(--amber)}
+.header-nav{display:flex;align-items:center;gap:8px}
+.nav-btn{padding:7px 16px;background:transparent;border:1px solid var(--border2);color:var(--muted);border-radius:3px;transition:all .2s}
+.nav-btn:hover{color:var(--text);border-color:var(--amber2)}
+.nav-btn.active{background:var(--bg2);color:var(--amber);border-color:var(--amber2)}
+.model-badge{display:flex;align-items:center;gap:6px;padding:5px 12px;background:var(--bg2);border:1px solid var(--border2);border-radius:3px}
+.model-badge-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:breathe 3s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.7}50%{opacity:1}}
+.model-badge span{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:.06em}
+
+/* Setup screen */
+.setup-wrap{max-width:640px;margin:40px auto}
+.setup-wrap h2{font-family:'Playfair Display',serif;font-size:30px;font-weight:900;margin-bottom:8px}
+.setup-wrap .subtitle{color:var(--muted);font-size:16px;margin-bottom:32px;line-height:1.7;max-width:500px}
+.no-gpu-card{background:var(--red2);border:1px solid var(--red);border-radius:6px;padding:20px 24px;margin-bottom:24px}
+.no-gpu-card h3{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--red);margin-bottom:8px;letter-spacing:.06em}
+.no-gpu-card p{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff9080;line-height:1.7}
+.model-cards{display:flex;flex-direction:column;gap:8px;margin-bottom:24px}
+.model-card{padding:14px 18px;background:var(--bg2);border:2px solid var(--border);border-radius:5px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between}
+.model-card:hover{border-color:var(--border2)}
+.model-card.selected{border-color:var(--amber);background:var(--bg3)}
+.model-card-info h4{font-family:'Playfair Display',serif;font-size:15px;font-weight:600;margin-bottom:3px}
+.model-card-info p{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)}
+.model-card-size{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber2);text-align:right}
+.model-card-size .rec{display:block;font-size:9px;color:var(--green);margin-top:2px;letter-spacing:.06em}
+.load-btn{width:100%;padding:14px;font-size:12px;border-radius:4px;margin-bottom:16px}
+.progress-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:16px 20px}
+.progress-label{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase}
+.progress-bar-track{height:4px;background:var(--border);border-radius:2px;margin-bottom:10px}
+.progress-bar-fill{height:4px;background:var(--amber);border-radius:2px;transition:width .3s ease}
+.progress-msg{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.progress-pct{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--amber);font-weight:500;margin-bottom:4px}
+.cache-note{margin-top:12px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--dim);line-height:1.6}
+
+/* Pipeline bar */
+.pipeline-bar{display:flex;align-items:center;padding:20px 0 0;margin-bottom:28px;overflow-x:auto}
+.ps{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:72px}
+.ps-dot{width:10px;height:10px;border-radius:50%;background:var(--dim);transition:all .4s}
+.ps-dot.running{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.ps-dot.complete{background:var(--green)}
+.ps-dot.ready{background:var(--border2)}
+.ps-label{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);transition:color .4s;text-align:center;line-height:1.3}
+.ps-label.running{color:var(--amber)}
+.ps-label.complete{color:var(--green)}
+.ps-label.ready{color:var(--muted)}
+.ps-connector{flex:1;height:1px;background:var(--border);min-width:16px;transition:background .4s;margin-bottom:15px}
+.ps-connector.lit{background:var(--amber2)}
+.ps-connector.done{background:var(--green2)}
+.ps-gate{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:36px}
+
+/* Idle */
+.idle-screen{text-align:center;padding:80px 0}
+.idle-screen h1{font-family:'Playfair Display',serif;font-size:42px;font-weight:900;line-height:1.1;margin-bottom:16px}
+.idle-screen h1 em{font-style:italic;color:var(--amber)}
+.idle-screen p{color:var(--muted);font-size:16px;max-width:440px;margin:0 auto 36px;line-height:1.7}
+.idle-model-chip{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber2);margin-bottom:24px;padding:5px 12px;border:1px solid var(--amber3);border-radius:3px}
+
+/* Buttons */
+.btn{padding:9px 20px;border-radius:3px;letter-spacing:.08em;transition:all .2s;font-size:11px}
+.btn-amber{background:var(--amber);color:#0d1117;font-weight:500}
+.btn-amber:hover{background:#e0b860}
+.btn-amber:disabled{background:var(--amber3);color:var(--amber2);cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text);border-color:var(--amber2)}
+.btn-green{background:var(--green2);color:var(--green);border:1px solid var(--green2)}
+.btn-green:hover{background:#3a8c5d}
+.btn-sm{padding:5px 12px;font-size:10px}
+
+/* Section cards */
+.section-card{margin-bottom:20px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;overflow:hidden;transition:border-color .3s}
+.section-card.active{border-color:var(--amber2)}
+.section-card.locked{opacity:.45;pointer-events:none}
+.section-header{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+.sh-left{display:flex;align-items:center;gap:12px}
+.sh-tag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--amber);text-transform:uppercase}
+.sh-title{font-family:'Playfair Display',serif;font-size:16px;font-weight:600}
+.sh-status{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--muted)}
+.sh-status.running{color:var(--amber)}
+.sh-status.complete{color:var(--green)}
+.sh-status.error{color:var(--red)}
+.section-body{padding:20px}
+
+/* Output */
+.output-area{background:var(--bg1);border:1px solid var(--border);border-radius:4px;padding:20px;font-family:'IBM Plex Mono',monospace;font-size:12px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-wrap:break-word;max-height:520px;overflow-y:auto;min-height:80px}
+.output-area::-webkit-scrollbar{width:4px}
+.output-area::-webkit-scrollbar-track{background:var(--bg)}
+.output-area::-webkit-scrollbar-thumb{background:var(--border2)}
+.output-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--muted);text-transform:uppercase;margin-bottom:8px}
+
+/* Loading */
+.loading-row{display:flex;align-items:center;gap:10px;padding:10px 0}
+.loading-dot{width:8px;height:8px;border-radius:50%;background:var(--amber);animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
+.loading-text{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted)}
+
+/* Approval gate */
+.approval-gate{margin-bottom:20px;background:var(--bg2);border:1px solid var(--amber3);border-radius:5px;overflow:hidden}
+.approval-gate-header{padding:16px 20px;border-bottom:1px solid var(--amber3);display:flex;align-items:center;justify-content:space-between}
+.approval-gate-header h3{font-family:'Playfair Display',serif;font-size:18px;font-weight:700}
+.approval-counter{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber)}
+.briefs-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+@media(max-width:700px){.briefs-grid{grid-template-columns:1fr}}
+.brief-card{background:var(--bg2);padding:16px 18px}
+.brief-card.approved{background:#0f1f17}
+.brief-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.brief-card-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.12em;color:var(--amber);text-transform:uppercase}
+.brief-card-ok{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--green)}
+.brief-text{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;color:var(--muted);margin-bottom:12px;max-height:120px;overflow-y:auto;white-space:pre-wrap}
+.brief-textarea{width:100%;padding:10px;font-size:11px;line-height:1.7;min-height:140px;margin-bottom:10px;resize:vertical}
+.brief-actions{display:flex;gap:6px}
+.approve-all-row{padding:16px 20px;border-top:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.send-back-area{flex:1}
+.send-back-area label{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:6px;letter-spacing:.06em;text-transform:uppercase}
+.send-back-area textarea{width:100%;padding:8px 12px;font-size:11px;min-height:60px;resize:vertical}
+
+/* Collapsible CEO brief in agent */
+.brief-from-ceo{background:var(--bg1);border:1px solid var(--border);border-radius:4px;margin-bottom:16px}
+.brief-from-ceo-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none}
+.brief-from-ceo-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;color:var(--amber2);text-transform:uppercase}
+.brief-from-ceo-body{padding:0 14px 12px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted);white-space:pre-wrap;line-height:1.7;border-top:1px solid var(--border)}
+
+.stage-action-row{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.stage-done-row{display:flex;gap:8px;margin-top:12px}
+.stream-controls{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.sh-status.stopped{color:#c08040}
+.stopped-note{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#c08040;margin-bottom:10px;letter-spacing:.04em}
+
+/* Error */
+.error-card{background:var(--red2);border:1px solid var(--red);border-radius:4px;padding:14px 16px;margin-bottom:12px}
+.error-card p{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#ff9080;line-height:1.6;margin-bottom:10px}
+
+/* Archive */
+.archive-list{display:flex;flex-direction:column;gap:1px;background:var(--border);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-top:4px}
+.archive-item{background:var(--bg2);padding:16px 20px;cursor:pointer;transition:background .2s;display:flex;align-items:center;justify-content:space-between}
+.archive-item:hover{background:var(--bg3)}
+.archive-item-title{font-family:'Playfair Display',serif;font-size:15px;font-weight:600;margin-bottom:4px}
+.archive-item-meta{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--muted)}
+.archive-detail-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;padding-top:8px}
+.archive-tabs{display:flex;gap:1px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:12px}
+.archive-tab{padding:7px 14px;background:var(--bg2);font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--muted);cursor:pointer;border:none;transition:all .2s;text-transform:uppercase}
+.archive-tab.active{background:var(--bg3);color:var(--amber)}
+.archive-empty{text-align:center;padding:60px;color:var(--dim);font-family:'IBM Plex Mono',monospace;font-size:12px;border:1px solid var(--border);border-radius:5px;margin-top:4px}
+
+/* Complete banner */
+.complete-banner{background:var(--green2);border:1px solid var(--green);border-radius:5px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between}
+.complete-banner p{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--green)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TODAY = new Date().toLocaleDateString('en-IN', {
+  weekday:'long', year:'numeric', month:'long', day:'numeric'
+});
+
+const MODELS = [
+  { id:'Llama-3.2-1B-Instruct-q4f16_1-MLC', name:'Llama 3.2 1B', size:'~0.8 GB', note:'Fastest, lightweight', rec:false },
+  { id:'Llama-3.2-3B-Instruct-q4f16_1-MLC', name:'Llama 3.2 3B', size:'~1.9 GB', note:'Best balance of speed and quality', rec:true },
+  { id:'Phi-3.5-mini-instruct-q4f16_1-MLC', name:'Phi 3.5 Mini', size:'~2.2 GB', note:'Microsoft — excellent writing quality', rec:false },
+  { id:'gemma-2-2b-it-q4f16_1-MLC', name:'Gemma 2 2B', size:'~1.4 GB', note:'Google — fast and capable', rec:false },
+];
+
+const CEO_PROMPT_BASE = `You are the CEO and Editorial Director of The Meridian — a weekly newsletter for curious, mid-20s Indians.
+
+THE MERIDIAN'S EDITORIAL THESIS:
+Geopolitics shapes travel. Where people can go, what they find when they arrive, and how destinations transform over time — these are always political stories. That is the lens through which The Meridian sees the world.
+
+THE THREE STORY ARCHETYPES WE PUBLISH:
+
+1. ACTIVE GEOPOLITICS × TRAVEL
+A diplomatic shift just opened a destination. Sanctions were lifted. A visa regime changed overnight. A region that was a no-go zone is now accessible. A conflict is reshaping a tourism economy. These are stories happening right now — the geopolitical event IS the travel story.
+
+2. TRANSFORMATION STORY
+A place that was a war zone, a closed authoritarian state, a city under siege — and has now completed that transformation into one of the most fascinating destinations in the world. Sarajevo. Kigali. Tbilisi. Hoi An. Phnom Penh. Berlin. These places carry their history in their architecture, their food, their people's faces. The tension between a violent past and a vivid present IS the story.
+
+CRITICAL RULE: A Transformation Story must be about a place where the transformation is SUBSTANTIALLY COMPLETE and where independent travel is GENUINELY POSSIBLE today. The reader should finish this story and think: "I can — and should — go here." If a place is still under active conflict, authoritarian lockdown, or carries a severe travel advisory for independent travelers, it is NOT a Transformation Story. It belongs in archetype 3.
+
+3. EMERGING DESTINATION
+Places that are currently unsafe or inaccessible — under authoritarian rule, active conflict, severe sanctions, or deep instability. Afghanistan. Iran. Myanmar. North Korea. Yemen. Syria. These are NOT travel stories. Do not recommend travel to these places.
+
+This is a story about POTENTIAL and PATIENCE. Frame it through the lens of successful transformations: How did Vietnam go from decades of bombing to one of Asia's most-visited countries? How did Rwanda go from genocide to the fastest-growing tourism economy in Africa? What does this place carry within itself — culturally, historically, architecturally — that the world does not yet know? What would need to happen for it to make that journey?
+
+The reader should finish this story feeling: "I hope I get to go there one day." They should understand the country deeply, feel its history, and carry genuine curiosity about its future — not a desire to travel there right now. This is education and imagination, not a travel guide.
+
+THE AUDIENCE:
+Young Indians aged 22-32. Globally curious, well-read, want depth. They are not looking for trip planning tips. They want to understand the world through the lens of places and people — and they want to feel something.
+
+THE INDIAN LENS:
+Always ask: what is the Indian angle? Not just "can Indians get a visa" but — what does an Indian traveler bring to this destination that a Western traveler does not? What Indian historical or political connections exist? How does the story land differently for someone whose country also carries the weight of partition, colonial history, and rapid transformation?
+
+WHAT MAKES A GREAT MERIDIAN STORY:
+- A current news hook that becomes the entry point to a deeper, slower story
+- A destination with layers — the surface is beautiful, but underneath is history, politics, human transformation
+- A point of view — The Meridian never just describes a place, it argues something about it
+- The human being at the centre — not governments, not statistics, but people and what they carry
+
+Today's date is ${TODAY}.`;
+
+function buildCEOPrompt(feedContext, recentHistory, preferredType) {
+  const typeLabel = t => t === 'active' ? 'Active Geopolitical × Travel' : t === 'transformation' ? 'Transformation Story' : t === 'emerging' ? 'Emerging Destination' : 'Unknown';
+  const historySection = recentHistory && recentHistory.length
+    ? `\nRECENT ISSUE HISTORY:\n${recentHistory.map((h, i) => `- ${i + 1} issue${i ? 's' : ''} ago: ${typeLabel(h.storyType)} — "${h.headline}"`).join('\n')}\nKeep a healthy mix across all three story types over time. Use your editorial judgment.\n`
+    : `\nNo previous issues yet — choose whichever story type has the strongest opportunity this week.\n`;
+
+  const preferenceSection = preferredType === 'active'
+    ? `\nEDITOR NUDGE: If a strong Active Geopolitical × Travel story exists this week, lean toward it.\n`
+    : preferredType === 'transformation'
+    ? `\nEDITOR NUDGE: If a strong Transformation Story exists this week, lean toward it.\n`
+    : '';
+
+  const newsSection = feedContext
+    ? `\nCURRENT NEWS CONTEXT (live RSS feeds fetched today):\n${feedContext}\nScan for geopolitical events with a travel dimension — countries opening or closing, conflicts reshaping tourism, diplomatic shifts, visa changes, peace deals. Also look for hooks into transformation stories.\n`
+    : `\nNote: Live news feeds could not be fetched. Draw on your training knowledge — transformation stories do not need to be in today's news.\n`;
+
+  return CEO_PROMPT_BASE + historySection + preferenceSection + newsSection + `
+Think carefully about:
+- Which active geopolitical situation RIGHT NOW has the most interesting travel dimension?
+- Which transformation story — a place that went from conflict or isolation to compelling destination — deserves to be told?
+- What does the young Indian reader not know that would genuinely change how they see a place or a conflict?
+- What angle does nobody else have?
+
+Then decide the story type for this issue and write task briefs for each agent.
+
+Output EXACTLY this format:
+
+MERIDIAN WEEKLY EDITORIAL PLAN
+Week of: [date]
+Prepared by: CEO Agent
+
+STORY TYPE: [Active Geopolitical × Travel / Transformation Story / Emerging Destination]
+
+STRATEGIC DIRECTION
+[2-3 sentences — what this issue is about and why this story type is right this week]
+
+RECOMMENDED STORY TERRITORY
+[One paragraph: specific region or situation, why it matters, what makes it right for The Meridian's audience]
+
+TASK BRIEF — NEWS SCOUT
+Focus areas for this week: [specific regions, conflicts, or diplomatic situations to scan]
+What to look for: [active geopolitics hooks or transformation angles — specific to this week]
+What to avoid this week: [surface travel content, anything without a political dimension]
+Success criteria: [what a strong brief looks like for this specific issue]
+
+TASK BRIEF — STORY FINDER
+The angle to look for: [specific editorial direction — what argument should this story make]
+The argument this issue should make: [a clear point of view about the destination or situation]
+What would make the editor most proud: [the depth and human truth this story should reach]
+Red flags to avoid: [romanticising conflict, ignoring political context, treating the destination as backdrop]
+
+TASK BRIEF — RESEARCHER
+Priority research areas: [history of the conflict or political situation, timeline of transformation, key turning points]
+Indian angle to develop: [specific India connections — diplomatic, historical, diaspora, visa, flight access]
+Traveler perception focus: [the gap between how this place is perceived and what it actually is]
+Depth vs breadth call: [what to go deep on, what to stay shallow on]
+
+TASK BRIEF — WRITER
+Tone for this issue: [specific guidance — more reflective? more urgent? more intimate?]
+Opening scene direction: [a specific human moment capturing the tension between past and present]
+The one thing this draft must achieve: [the single emotional or intellectual thing the reader must feel]
+Voice notes: [style guidance specific to this story's weight and subject matter]
+
+TASK BRIEF — EDITOR PREP
+What to watch for in this draft specifically: [sentimentality about conflict, over-explaining history, losing the human thread]
+The editor's voice opportunity: [where the editor's perspective on geopolitics and travel should come through]
+Publishing checklist additions: [anything specific to the sensitivity or complexity of this issue]
+
+CEO CONFIDENCE LEVEL: [High / Medium / Low]
+CEO NOTES FOR EDITOR: [Concerns, why this story type was chosen this week, alternatives considered, safety/access status if relevant]`;
+}
+
+const AGENT_PROMPTS = {
+  scout: `You are the News Scout for The Meridian — a weekly newsletter for curious, mid-20s Indians about travel, culture, and geopolitics.
+
+Your CEO has given you a specific task brief for this week (see above). Follow it precisely.
+
+Identify 5 of the most interesting stories from your knowledge that match your brief. Focus on the intersection of travel, geopolitics, and culture.
+
+The audience: Young Indians aged 22-32. Globally aware, curious, want depth and a point of view.
+
+Output EXACTLY this format:
+
+MERIDIAN DAILY BRIEF — ${TODAY}
+
+STORY 1
+Headline: [one line]
+Region: [location]
+Category: [Travel / Geopolitics / Culture]
+Why it matters: [2-3 sentences]
+Newsletter angle: [one sentence]
+Source: [publication name]
+
+[Repeat for Stories 2-5]
+
+ONE TO WATCH
+[Developing story worth tracking — one paragraph]
+
+CEO BRIEF ALIGNMENT NOTE:
+[One sentence on how this brief aligns with what the CEO asked for]`,
+
+  story: `You are the Story Finder for The Meridian newsletter.
+
+Your CEO has given you a specific task brief for this week (see above). Follow it precisely.
+
+You have the scout brief below. Pick the single strongest story that matches the CEO's editorial direction and develop a full pitch.
+
+The Meridian's values:
+- Stories connecting travel, culture, and geopolitics
+- Strong point of view, a clear argument
+- Relevant to young curious Indians
+- Never romanticises conflict, people always at the centre
+- Depth over breadth
+
+Output EXACTLY this format:
+
+RECOMMENDED STORY: [headline]
+
+WHY THIS ONE: [2-3 sentences]
+
+THREE HEADLINE OPTIONS:
+1. [Punchy, curiosity-driven]
+2. [Emotional, human-focused]
+3. [Contrarian or surprising]
+
+THE ANGLE: [One paragraph]
+
+WHY THIS AUDIENCE CARES: [One paragraph]
+
+STRUCTURE:
+- Opening hook: [specific scene or moment]
+- Section 1: [topic]
+- Section 2: [topic]
+- Section 3: [topic]
+- Closing argument: [one sentence]
+
+RESEARCH NEEDED:
+[Bullet list]
+
+WHY THE OTHERS WERE REJECTED:
+[One line on each rejected story]`,
+
+  researcher: `You are the Researcher for The Meridian newsletter.
+
+Your CEO has given you a specific task brief for this week (see above). Follow it precisely.
+
+You have the editorial pitch below. Research this story thoroughly using your knowledge. For every fact: note source where possible, flag anything uncertain.
+
+Output EXACTLY this format:
+
+RESEARCH BRIEF — [STORY HEADLINE]
+Date: ${TODAY}
+
+BACKGROUND AND HISTORY
+[Historical context with sources]
+
+KEY FACTS AND STATISTICS
+[Numbered list with sources and dates]
+
+CURRENT SITUATION
+[Most recent information available from your knowledge]
+
+HUMAN STORIES AND DETAILS
+[Specific people, places, moments, quotes]
+
+INDIAN ANGLE
+[Visa info, flight connections, Indian traveler perspective, Indian government position]
+
+TRAVELER PERCEPTION
+[Accounts, perception vs reality, practical info]
+
+ALL SOURCES
+[Key references used]
+
+FLAG FOR EDITOR
+[Anything uncertain or needing verification]
+
+CEO BRIEF ALIGNMENT NOTE:
+[One sentence on how this research fulfills what the CEO asked for]`,
+
+  writer: `You are the Writer for The Meridian newsletter.
+
+Your CEO has given you specific tone and voice guidance for this week (see above). Follow it.
+
+You have the full research document below. Write a complete first draft.
+
+THE MERIDIAN VOICE:
+- Conversational but intelligent, like a well-read friend explaining something fascinating
+- Strong point of view, never neutral
+- Opens with a specific human moment or scene, NEVER a statistic
+- Short punchy sentences mixed with longer flowing ones
+- Never romanticises conflict, people always at the centre
+- Ends with a line that makes the reader feel something, NOT a summary
+- No bullet points anywhere in the article
+- Subheadings are bold statements or provocative questions, never labels
+- Target length: 1200-1500 words
+
+Output EXACTLY this format:
+
+ISSUE DRAFT — [HEADLINE]
+
+SUBJECT LINE OPTIONS:
+1. [option]
+2. [option]
+3. [option]
+
+PREVIEW TEXT OPTIONS (max 90 characters):
+1. [option]
+2. [option]
+
+---
+[FULL ARTICLE]
+---
+
+WRITER NOTES:
+[Sections uncertain about, facts to check, places for editor's personal voice]`,
+
+  editor: `You are the Editorial Assistant for The Meridian.
+
+Your CEO has given you specific guidance on what to watch for in this draft (see above). Use it.
+
+You have the first draft below. Prepare a specific, actionable editing report for the human editor.
+
+Be specific. Quote actual sentences. Not "the opening could be stronger" but "the opening spends 3 sentences on context before the hook."
+
+Output EXACTLY this format:
+
+EDITOR PREP REPORT — [HEADLINE]
+
+OVERALL ASSESSMENT:
+[2-3 sentences]
+
+WHAT IS WORKING:
+[Bullet list, quote actual sentences]
+
+WHAT NEEDS ATTENTION:
+[Numbered list, most important first. For each: quote the passage, explain issue, suggest fix]
+
+WHERE YOUR VOICE IS MISSING:
+[Specific moments where the editor's personal voice should go]
+
+FACTS TO VERIFY:
+[Claims to double-check]
+
+SUGGESTED CUTS:
+[Passages to remove, quoted]
+
+FINAL CHECKLIST:
+[ ] Opening is a scene or moment, not a fact
+[ ] At least one sentence is clearly the editor's voice
+[ ] Ending lands, does not summarise
+[ ] No passive voice in first or last paragraph
+[ ] Subject line and preview text written
+[ ] Word count 1200-1500 words
+[ ] CEO's editorial vision fulfilled`
+};
+
+const BRIEF_KEYS = ['newsScout','storyFinder','researcher','writer','editorPrep'];
+const BRIEF_LABELS = { newsScout:'News Scout', storyFinder:'Story Finder', researcher:'Researcher', writer:'Writer', editorPrep:'Editor Prep' };
+const AGENT_KEYS = ['scout','story','researcher','writer','editor'];
+const AGENT_LABELS = { scout:'News Scout', story:'Story Finder', researcher:'Researcher', writer:'Writer', editor:'Editor Prep' };
+const AGENT_TO_BRIEF = { scout:'newsScout', story:'storyFinder', researcher:'researcher', writer:'writer', editor:'editorPrep' };
+const BRIEF_TO_AGENT = { newsScout:'scout', storyFinder:'story', researcher:'researcher', writer:'writer', editorPrep:'editor' };
+const AGENT_DEPS = { scout:null, story:'scout', researcher:'story', writer:'researcher', editor:'writer' };
+const DEP_LABEL = { story:'News Scout', researcher:'Story Finder', writer:'Researcher', editor:'Writer' };
+const AGENT_LOADING = {
+  scout:'Scout is scanning the landscape...',
+  story:'Story Finder is analysing the brief...',
+  researcher:'Researcher is digging into the story...',
+  writer:'Writer is drafting the issue...',
+  editor:'Preparing your editing report...'
+};
+
+// Appropriate token caps per stage — prevents over-generation on slow hardware
+const AGENT_MAX_TOKENS = {
+  ceo: 1800, scout: 500, story: 500,
+  researcher: 800, writer: 1200, editor: 500,
+};
+
+// Stream using WebLLM engine (async iterator)
+async function streamCall({ engine, system, messages, onChunk, onDone, onError, onStop, pauseRef, stopRef, maxTokens }) {
+  try {
+    const allMsgs = [{ role:'system', content:system }, ...messages];
+    const stream = await engine.chat.completions.create({
+      messages: allMsgs,
+      stream: true,
+      max_tokens: maxTokens || 2000,
+      temperature: 0.7,
+    });
+    let full = '';
+    for await (const chunk of stream) {
+      if (stopRef?.current) { (onStop || onDone)(full); return; }
+      while (pauseRef?.current && !stopRef?.current) {
+        await new Promise(r => setTimeout(r, 150));
+      }
+      if (stopRef?.current) { (onStop || onDone)(full); return; }
+      const delta = chunk.choices?.[0]?.delta?.content || '';
+      if (delta) { full += delta; onChunk(full); }
+      if (chunk.choices?.[0]?.finish_reason === 'stop') { onDone(full); return; }
+    }
+    onDone(full);
+  } catch(err) {
+    // interruptGenerate() throws — treat it as a user stop, not an error
+    if (stopRef?.current) {
+      (onStop || onDone)(full);
+    } else {
+      onError(err.message || 'Model error');
+    }
+  }
+}
+
+function parseBriefs(text) {
+  const extract = (start, end) => {
+    const rx = new RegExp(start + '([\\s\\S]*?)(?=' + end + '|CEO CONFIDENCE LEVEL|$)');
+    const m = text.match(rx);
+    return m ? m[1].trim() : '';
+  };
+  return {
+    newsScout:   extract('TASK BRIEF — NEWS SCOUT\\s*\\n',   'TASK BRIEF — STORY FINDER'),
+    storyFinder: extract('TASK BRIEF — STORY FINDER\\s*\\n', 'TASK BRIEF — RESEARCHER'),
+    researcher:  extract('TASK BRIEF — RESEARCHER\\s*\\n',   'TASK BRIEF — WRITER'),
+    writer:      extract('TASK BRIEF — WRITER\\s*\\n',       'TASK BRIEF — EDITOR PREP'),
+    editorPrep:  extract('TASK BRIEF — EDITOR PREP\\s*\\n',  'CEO CONFIDENCE LEVEL'),
+  };
+}
+
+function extractHeadline(text) {
+  const m = text.match(/ISSUE DRAFT\s*[—\-]+\s*(.+)/);
+  return m ? m[1].trim() : 'Untitled Issue';
+}
+
+function extractStoryType(ceoText) {
+  const m = ceoText.match(/STORY TYPE:\s*(.+)/i);
+  if (!m) return 'unknown';
+  const val = m[1].toLowerCase();
+  if (val.includes('active') || val.includes('geopolit')) return 'active';
+  if (val.includes('emerging')) return 'emerging';
+  if (val.includes('transform')) return 'transformation';
+  return 'unknown';
+}
+
+const STORY_TYPE_META = {
+  active:         { label: 'Active Geo',     color: 'var(--amber)',  bg: 'var(--amber3)',  border: 'var(--amber2)' },
+  transformation: { label: 'Transformation', color: '#6aacdc',       bg: '#1a3a5a',        border: '#2a5a8a'       },
+  emerging:       { label: 'Emerging',       color: '#a07ed4',       bg: '#2a1a4a',        border: '#4a3a6a'       },
+  unknown:        { label: '?',              color: 'var(--muted)',   bg: 'var(--bg3)',     border: 'var(--border)' },
+};
+
+function getRecentHistory(archive) {
+  return archive.slice(0, 4).map(issue => ({
+    headline: issue.headline,
+    date: issue.date,
+    storyType: issue.storyType || 'unknown',
+  }));
+}
+
+// ─── RSS feed fetching ────────────────────────────────────────────────────────
+// Multiple public news APIs with CORS support — no API key needed
+async function fetchDevTo() {
+  const url = 'https://dev.to/api/articles?state=fresh&tags=travel,geopolitics,culture&limit=10&sort_by=published_at';
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return null;
+    const data = await r.json();
+    if (!data?.length) return null;
+    const items = data.slice(0, 8).map(a => ({ title: a.title?.trim(), blurb: a.description?.trim() || '' })).filter(i => i.title);
+    return items.length ? { name: 'Dev.to (Culture & Travel)', items } : null;
+  } catch (_) { clearTimeout(timer); return null; }
+}
+
+async function fetchHackerNews() {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const r = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json?limitToFirst=20', { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (!r.ok) return null;
+    const ids = await r.json();
+    if (!ids?.length) return null;
+    const items = [];
+    for (const id of ids.slice(0, 8)) {
+      try {
+        const ir = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`, { signal: ctrl.signal });
+        if (ir.ok) {
+          const item = await ir.json();
+          if (item?.title) items.push({ title: item.title.trim(), blurb: '' });
+        }
+      } catch(_) {}
+      if (items.length >= 8) break;
+    }
+    return items.length ? { name: 'Hacker News (Tech & Society)', items } : null;
+  } catch (_) { clearTimeout(timer); return null; }
+}
+
+async function fetchRSSFeeds() {
+  const settled = await Promise.allSettled([fetchDevTo(), fetchHackerNews()]);
+  return settled.map(r => r.value).filter(Boolean);
+}
+
+function formatFeedsForCEO(feeds) {
+  if (!feeds.length) return null;
+  const lines = [];
+  for (const feed of feeds) {
+    lines.push(`[${feed.name}]`);
+    feed.items.forEach(item => {
+      lines.push(`• ${item.title}`);
+      if (item.blurb) lines.push(`  ${item.blurb}`);
+    });
+    lines.push('');
+  }
+  return lines.join('\n').trim();
+}
+
+// ─── Small components ────────────────────────────────────────────────────────
+function LoadingDot({ text }) {
+  return (
+    <div className="loading-row">
+      <div className="loading-dot" />
+      <span className="loading-text">{text}</span>
+    </div>
+  );
+}
+
+function PipelineBar({ ceoStatus, allApproved, agents }) {
+  const s = k => agents[k]?.status || 'locked';
+  const dot = st => st==='running'?'running':st==='complete'?'complete':st==='ready'?'ready':'';
+  const conn = st => st==='complete'?'done':st==='running'?'lit':'';
+  return (
+    <div className="pipeline-bar">
+      <div className="ps">
+        <div className={`ps-dot ${dot(ceoStatus)}`} />
+        <div className={`ps-label ${dot(ceoStatus)}`}>CEO</div>
+      </div>
+      <div className={`ps-connector ${ceoStatus==='complete'?'done':''}`} />
+      <div className="ps-gate">
+        <div style={{fontSize:14,marginBottom:15,color:allApproved?'var(--green)':'var(--dim)'}}>{allApproved?'✓':'🔒'}</div>
+        <div style={{fontFamily:'IBM Plex Mono',fontSize:'9px',letterSpacing:'.1em',color:allApproved?'var(--green)':'var(--dim)',textTransform:'uppercase'}}>Gate</div>
+      </div>
+      <div className={`ps-connector ${allApproved?'done':''}`} />
+      {AGENT_KEYS.map((key, i) => (
+        <React.Fragment key={key}>
+          <div className="ps">
+            <div className={`ps-dot ${dot(s(key))}`} />
+            <div className={`ps-label ${dot(s(key))}`}>{AGENT_LABELS[key]}</div>
+          </div>
+          {i < AGENT_KEYS.length - 1 && <div className={`ps-connector ${conn(s(key))}`} />}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function BriefCard({ bkey, approval, onApprove, onToggleEdit, onEditChange, onApplyEdit }) {
+  const { text, approved, editing, editText } = approval;
+  return (
+    <div className={`brief-card${approved?' approved':''}`}>
+      <div className="brief-card-header">
+        <span className="brief-card-title">{BRIEF_LABELS[bkey]}</span>
+        {approved && <span className="brief-card-ok">✓ Approved</span>}
+      </div>
+      {!editing
+        ? <div className="brief-text">{text||'—'}</div>
+        : <textarea className="brief-textarea" value={editText} onChange={e=>onEditChange(bkey,e.target.value)} />}
+      <div className="brief-actions">
+        {!approved&&!editing&&<>
+          <button className="btn btn-green btn-sm" onClick={()=>onApprove(bkey)}>Approve</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>onToggleEdit(bkey,true)}>Edit</button>
+        </>}
+        {editing&&<>
+          <button className="btn btn-amber btn-sm" onClick={()=>onApplyEdit(bkey)}>Apply & Approve</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>onToggleEdit(bkey,false)}>Cancel</button>
+        </>}
+        {approved&&!editing&&<button className="btn btn-ghost btn-sm" onClick={()=>onToggleEdit(bkey,true)}>Edit</button>}
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleBrief({ brief }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="brief-from-ceo">
+      <div className="brief-from-ceo-header" onClick={()=>setOpen(o=>!o)}>
+        <span className="brief-from-ceo-label">Your brief from the CEO</span>
+        <span style={{color:'var(--amber2)',fontSize:'11px'}}>{open?'▲':'▼'}</span>
+      </div>
+      {open && <div className="brief-from-ceo-body">{brief}</div>}
+    </div>
+  );
+}
+
+function ElapsedTimer({ running }) {
+  const [secs, setSecs] = useState(0);
+  const startRef = useRef(null);
+  useEffect(() => {
+    if (!running) { setSecs(0); startRef.current = null; return; }
+    startRef.current = Date.now();
+    const iv = setInterval(() => setSecs(Math.floor((Date.now() - startRef.current) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [running]);
+  if (!running) return null;
+  const m = Math.floor(secs / 60), s = secs % 60;
+  return (
+    <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)'}}>
+      {m > 0 ? `${m}m ${s}s` : `${s}s`}
+    </span>
+  );
+}
+
+function AgentSection({ agentKey, brief, status, output, error, isPaused, onRun, onRegen, onPause, onResume, onStopStream }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const outRef = useRef(null);
+  const estTokens = Math.round((output||'').length / 4);
+  useEffect(() => {
+    if (outRef.current && status==='running') outRef.current.scrollTop = outRef.current.scrollHeight;
+  }, [output, status]);
+  const locked = status==='locked';
+  const waiting = status==='waiting';
+  const depName = DEP_LABEL[agentKey];
+  return (
+    <div className={`section-card${status==='running'?' active':''}${locked?' locked':''}`}>
+      <div className="section-header" onClick={()=>!locked&&setCollapsed(c=>!c)}>
+        <div className="sh-left">
+          <span className="sh-tag">Agent</span>
+          <span className="sh-title">{AGENT_LABELS[agentKey]}</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          <span className={`sh-status ${status}`}>{status}</span>
+          {!locked && <span style={{color:'var(--dim)',fontSize:12}}>{collapsed?'▼':'▲'}</span>}
+        </div>
+      </div>
+      {!locked && !collapsed && (
+        <div className="section-body">
+          {brief && <CollapsibleBrief brief={brief} />}
+          {waiting && (
+            <div className="loading-row" style={{opacity:.7}}>
+              <div className="loading-dot" style={{background:'var(--amber2)'}} />
+              <span className="loading-text">
+                Waiting for <strong style={{color:'var(--amber)'}}>{depName}</strong> to complete before this agent can begin.
+              </span>
+            </div>
+          )}
+          {status==='running' && (
+            <>
+              <div className="stream-controls">
+                <LoadingDot text={isPaused ? 'Paused...' : AGENT_LOADING[agentKey]} />
+                <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                  <ElapsedTimer running={status==='running' && !isPaused} />
+                  {!isPaused
+                    ? <button className="btn btn-ghost btn-sm" onClick={onPause} style={{color:'var(--amber)'}}>⏸ Pause</button>
+                    : <button className="btn btn-amber btn-sm" onClick={onResume}>▶ Resume</button>}
+                  <button className="btn btn-ghost btn-sm" onClick={onStopStream} style={{color:'var(--red)'}}>■ Stop</button>
+                </div>
+              </div>
+              {estTokens > 0 && (
+                <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--dim)',marginBottom:8}}>
+                  ~{estTokens} tokens generated · limit {AGENT_MAX_TOKENS[agentKey]}
+                </div>
+              )}
+            </>
+          )}
+          {status==='stopped' && (
+            <p className="stopped-note">■ Stopped — partial output below. Regenerate to run again.</p>
+          )}
+          {error && (
+            <div className="error-card">
+              <p>{error}</p>
+              <button className="btn btn-ghost btn-sm" onClick={onRun}>Retry</button>
+            </div>
+          )}
+          {output && (
+            <>
+              <div className="output-label">{status==='stopped' ? 'Partial Output' : 'Output'}</div>
+              <div className="output-area" ref={outRef}>{output}</div>
+              {(status==='complete' || status==='stopped') && (
+                <div className="stage-done-row">
+                  <button className="btn btn-ghost btn-sm" onClick={onRegen}>Regenerate</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArchiveView({ archive }) {
+  const [selected, setSelected] = useState(null);
+  const [activeTab, setActiveTab] = useState('ceo');
+  const TABS = [{key:'ceo',label:'CEO Plan'},{key:'scout',label:'Scout'},{key:'story',label:'Story'},{key:'researcher',label:'Research'},{key:'writer',label:'Writer'},{key:'editor',label:'Editor Prep'}];
+  const exportMd = issue => {
+    const parts = [`# ${issue.headline}`,`*${issue.date}*\n`,`## CEO Plan\n\n${issue.ceoOutput||''}`,`## Scout\n\n${issue.scout||''}`,`## Story\n\n${issue.story||''}`,`## Research\n\n${issue.researcher||''}`,`## Draft\n\n${issue.writer||''}`,`## Editor Report\n\n${issue.editor||''}`];
+    const blob = new Blob([parts.join('\n\n---\n\n')],{type:'text/markdown'});
+    const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`meridian-${issue.id}.md`; a.click();
+  };
+  if (!archive.length) return <div className="archive-empty">No issues saved yet. Complete an issue to save it here.</div>;
+  if (selected) {
+    const content = {ceo:selected.ceoOutput,scout:selected.scout,story:selected.story,researcher:selected.researcher,writer:selected.writer,editor:selected.editor};
+    return (
+      <div>
+        <div className="archive-detail-header">
+          <div>
+            <h2 style={{fontFamily:'Playfair Display,serif',fontSize:20,fontWeight:700}}>{selected.headline}</h2>
+            <div style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--muted)',marginTop:4}}>{selected.date}</div>
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button className="btn btn-ghost btn-sm" onClick={()=>exportMd(selected)}>Export .md</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>setSelected(null)}>← Back</button>
+          </div>
+        </div>
+        <div className="archive-tabs">{TABS.map(t=><button key={t.key} className={`archive-tab${activeTab===t.key?' active':''}`} onClick={()=>setActiveTab(t.key)}>{t.label}</button>)}</div>
+        <div className="output-area" style={{maxHeight:600}}>{content[activeTab]||'No output saved.'}</div>
+      </div>
+    );
+  }
+  return (
+    <div className="archive-list">
+      {archive.map(issue=>{
+        const tm = STORY_TYPE_META[issue.storyType] || STORY_TYPE_META.unknown;
+        return (
+          <div key={issue.id} className="archive-item" onClick={()=>{setSelected(issue);setActiveTab('ceo')}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+              <span style={{fontFamily:'IBM Plex Mono',fontSize:9,padding:'2px 6px',borderRadius:2,background:tm.bg,color:tm.color,border:`1px solid ${tm.border}`}}>
+                {tm.label}
+              </span>
+              <div className="archive-item-meta">{issue.date}</div>
+            </div>
+            <div className="archive-item-title">{issue.headline}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Model Loader screen ──────────────────────────────────────────────────────
+function ModelLoader({ onReady }) {
+  const savedModel = localStorage.getItem('meridian_model');
+  const [selected, setSelected] = useState(savedModel || MODELS[1].id);
+  const [loading, setLoading] = useState(false);
+  const [autoLoading, setAutoLoading] = useState(!!savedModel);
+  const [progress, setProgress] = useState(0);
+  const [progressMsg, setProgressMsg] = useState('');
+  const [error, setError] = useState('');
+  const [libReady, setLibReady] = useState(!!window._WebLLM);
+  const hasGPU = !!navigator.gpu;
+
+  useEffect(() => {
+    if (!window._WebLLM) {
+      const handler = () => setLibReady(true);
+      document.addEventListener('webllm-ready', handler, { once: true });
+      return () => document.removeEventListener('webllm-ready', handler);
+    }
+  }, []);
+
+  // When library is ready, auto-load from cache if we have a saved model
+  useEffect(() => {
+    if (libReady && savedModel && hasGPU && autoLoading) {
+      loadModel(savedModel);
+    }
+  }, [libReady]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadModel = async (modelId) => {
+    setLoading(true); setError(''); setProgress(0); setProgressMsg('Loading from cache...');
+    try {
+      const engine = new window._WebLLM.MLCEngine();
+      await engine.reload(modelId, {
+        initProgressCallback: (report) => {
+          setProgress(Math.round((report.progress || 0) * 100));
+          setProgressMsg(report.text || '');
+        }
+      });
+      localStorage.setItem('meridian_model', modelId);
+      onReady(engine, modelId);
+    } catch(err) {
+      setError(err.message || 'Failed to load model');
+      setLoading(false);
+      setAutoLoading(false);
+    }
+  };
+
+  const load = async () => {
+    if (!window._WebLLM) { setError('WebLLM library not loaded yet. Please wait a moment and try again.'); return; }
+    loadModel(selected);
+  };
+
+  // Simplified auto-load screen (returning user)
+  if (autoLoading) {
+    const modelLabel = MODELS.find(m => m.id === savedModel)?.name || savedModel;
+    return (
+      <div className="app">
+        <div className="header"><div className="logo">The <span>Meridian</span></div></div>
+        <div style={{maxWidth:460,margin:'80px auto',padding:32,background:'var(--bg2)',border:'1px solid var(--border2)',borderRadius:6}}>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:12}}>Resuming session</div>
+          <div style={{fontFamily:'Playfair Display,serif',fontSize:22,fontWeight:700,marginBottom:6}}>Loading {modelLabel}</div>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--muted)',marginBottom:20}}>
+            {!libReady ? 'Waiting for library...' : 'Restoring from browser cache — this takes a few seconds.'}
+          </div>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:14,color:'var(--amber)',marginBottom:6}}>{progress}%</div>
+          <div style={{height:4,background:'var(--border)',borderRadius:2,marginBottom:10}}>
+            <div style={{height:4,background:'var(--amber)',borderRadius:2,width:`${progress}%`,transition:'width .3s ease'}} />
+          </div>
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--dim)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginBottom:20}}>{progressMsg}</div>
+          {error && <div className="error-card" style={{marginBottom:12}}><p>{error}</p></div>}
+          <button className="btn btn-ghost btn-sm" onClick={()=>{setAutoLoading(false);setLoading(false);setError('');}}>
+            Choose a different model
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      <div className="header">
+        <div className="logo">The <span>Meridian</span></div>
+      </div>
+      <div className="setup-wrap">
+        <h2>Choose your model</h2>
+        <p className="subtitle">The Meridian runs AI entirely in your browser — no API key, no server. Models download once and are cached for all future sessions.</p>
+
+        {!hasGPU && (
+          <div className="no-gpu-card">
+            <h3>WebGPU not available</h3>
+            <p>Your browser does not support WebGPU, which is required to run AI models locally.<br/><br/>
+            To fix this: use Chrome 113+ or Edge 113+. On Chrome, make sure hardware acceleration is enabled in Settings.</p>
+          </div>
+        )}
+
+        {!libReady && (
+          <div style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--muted)',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
+            <div className="loading-dot" /> Loading AI library...
+          </div>
+        )}
+
+        {hasGPU && (
+          <>
+            <div className="model-cards">
+              {MODELS.map(m => (
+                <div key={m.id} className={`model-card${selected===m.id?' selected':''}`} onClick={()=>!loading&&setSelected(m.id)}>
+                  <div className="model-card-info">
+                    <h4>{m.name}</h4>
+                    <p>{m.note}</p>
+                  </div>
+                  <div className="model-card-size">
+                    {m.size}
+                    {m.rec && <span className="rec">★ recommended</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {!loading && (
+              <button className="btn btn-amber load-btn" onClick={load} disabled={!libReady||!hasGPU}>
+                {libReady ? 'Download & Load Model' : 'Waiting for library...'}
+              </button>
+            )}
+
+            {loading && (
+              <div className="progress-wrap">
+                <div className="progress-label">Loading model</div>
+                <div className="progress-pct">{progress}%</div>
+                <div className="progress-bar-track">
+                  <div className="progress-bar-fill" style={{width:`${progress}%`}} />
+                </div>
+                <div className="progress-msg">{progressMsg}</div>
+                <div className="cache-note">First load downloads the model ({MODELS.find(m=>m.id===selected)?.size}). After that it loads instantly from your browser cache.</div>
+              </div>
+            )}
+
+            {error && (
+              <div className="error-card" style={{marginTop:12}}>
+                <p>{error}</p>
+                <button className="btn btn-ghost btn-sm" onClick={()=>{setError('');setLoading(false);}}>Try Again</button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────────────────────
+function App() {
+  const [engine, setEngine] = useState(null);
+  const [modelName, setModelName] = useState('');
+  const [activeTab, setActiveTab] = useState('pipeline');
+
+  const [ceoStatus, setCeoStatus] = useState('idle');
+  const [ceoOutput, setCeoOutput] = useState('');
+  const [ceoError, setCeoError] = useState('');
+  const [feedStatus, setFeedStatus] = useState('idle');
+  const [feedSources, setFeedSources] = useState([]);
+  const [preferredType, setPreferredType] = useState('either'); // 'active' | 'transformation' | 'either'
+  const [topicInput, setTopicInput] = useState('');
+
+  const initApprovals = () => ({
+    newsScout:   {text:'',approved:false,editing:false,editText:''},
+    storyFinder: {text:'',approved:false,editing:false,editText:''},
+    researcher:  {text:'',approved:false,editing:false,editText:''},
+    writer:      {text:'',approved:false,editing:false,editText:''},
+    editorPrep:  {text:'',approved:false,editing:false,editText:''},
+  });
+  const [approvals, setApprovals] = useState(initApprovals());
+  const [sendBack, setSendBack] = useState('');
+
+  const initAgents = () => ({
+    scout:      {status:'locked',output:'',error:''},
+    story:      {status:'locked',output:'',error:''},
+    researcher: {status:'locked',output:'',error:''},
+    writer:     {status:'locked',output:'',error:''},
+    editor:     {status:'locked',output:'',error:''},
+  });
+  const [agents, setAgents] = useState(initAgents());
+  const [issueSaved, setIssueSaved] = useState(false);
+
+  const [archive, setArchive] = useState(()=>{
+    try{return JSON.parse(localStorage.getItem('meridian_archive')||'[]');}catch{return[];}
+  });
+
+  // Saved draft from a previous (unclosed) session
+  const [savedDraft, setSavedDraft] = useState(()=>{
+    try{
+      const d = JSON.parse(localStorage.getItem('meridian_draft')||'null');
+      if (!d) return null;
+      if (Date.now() - d.timestamp > 7*24*60*60*1000) { localStorage.removeItem('meridian_draft'); return null; }
+      return d;
+    }catch{return null;}
+  });
+
+  const ceoRef = useRef(null);
+  const pauseRef = useRef(false);
+  const stopRef = useRef(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const pauseStream  = () => { pauseRef.current = true;  setIsPaused(true);  };
+  const resumeStream = () => { pauseRef.current = false; setIsPaused(false); };
+  const stopStream   = () => {
+    stopRef.current = true;
+    pauseRef.current = false;
+    setIsPaused(false);
+    // Tell WebLLM to immediately abort — without this, the for-await loop
+    // stays blocked waiting for the next token and stop feels broken
+    try { engine?.interruptGenerate?.(); } catch(_) {}
+  };
+  const resetStream  = () => { stopRef.current = false; pauseRef.current = false; setIsPaused(false); };
+
+  useEffect(()=>{
+    if (ceoRef.current && ceoStatus==='running') ceoRef.current.scrollTop = ceoRef.current.scrollHeight;
+  },[ceoOutput, ceoStatus]);
+
+  const approvalCount = Object.values(approvals).filter(a=>a.approved).length;
+  const allApproved = approvalCount===5;
+
+  // Auto-save pipeline state to localStorage so closing the tab doesn't lose work
+  useEffect(()=>{
+    if (ceoStatus === 'idle') return;
+    const timer = setTimeout(()=>{
+      const draft = {
+        timestamp: Date.now(),
+        ceoStatus:  ceoStatus  === 'running' ? 'stopped' : ceoStatus,
+        ceoOutput,  feedSources,  approvals,
+        agents: Object.fromEntries(Object.entries(agents).map(([k,v])=>[k,{
+          ...v, status: v.status==='running'?'stopped':v.status
+        }])),
+      };
+      localStorage.setItem('meridian_draft', JSON.stringify(draft));
+    }, 1200);
+    return ()=> clearTimeout(timer);
+  }, [ceoStatus, ceoOutput, approvals, agents]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-chain: when an agent completes, kick off the next one if it's waiting
+  useEffect(()=>{
+    AGENT_KEYS.forEach((key, i) => {
+      if (agents[key].status === 'complete' && i < AGENT_KEYS.length - 1) {
+        const nk = AGENT_KEYS[i + 1];
+        if (agents[nk].status === 'waiting') {
+          runAgent(nk);
+        }
+      }
+    });
+  }, [agents]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const onReady = (eng, name) => { setEngine(eng); setModelName(name); };
+
+  const restoreSession = () => {
+    if (!savedDraft) return;
+    setCeoStatus(savedDraft.ceoStatus);
+    setCeoOutput(savedDraft.ceoOutput || '');
+    setApprovals(savedDraft.approvals || initApprovals());
+    setAgents(savedDraft.agents || initAgents());
+    setFeedSources(savedDraft.feedSources || []);
+    setFeedStatus(savedDraft.feedSources?.length ? 'done' : 'idle');
+    setSavedDraft(null);
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem('meridian_draft');
+    setSavedDraft(null);
+  };
+
+  const startCEO = async (feedback) => {
+    resetStream();
+    setCeoStatus('running'); setCeoOutput(''); setCeoError('');
+    setFeedStatus('fetching'); setFeedSources([]);
+    setApprovals(initApprovals()); setAgents(initAgents()); setIssueSaved(false);
+
+    // Fetch RSS feeds for live news context
+    let feedContext = null;
+    try {
+      const feeds = await fetchRSSFeeds();
+      if (feeds.length) {
+        feedContext = formatFeedsForCEO(feeds);
+        setFeedSources(feeds.map(f => f.name));
+        setFeedStatus('done');
+      } else {
+        setFeedStatus('failed');
+      }
+    } catch (_) {
+      setFeedStatus('failed');
+    }
+
+    // If feeds failed, check if user pasted manual headlines
+    if (!feedContext) {
+      const manual = document.getElementById('manual-headlines')?.value?.trim();
+      if (manual) {
+        feedContext = `MANUALLY PROVIDED HEADLINES:\n${manual.split('\n').filter(Boolean).map(l => `• ${l.trim()}`).join('\n')}`;
+      }
+    }
+
+    const recentHistory = getRecentHistory(archive);
+    const system = buildCEOPrompt(feedContext, recentHistory, preferredType);
+    const topic = topicInput.trim();
+    const msg = feedback
+      ? `Today is ${TODAY}. Feedback on your previous plan: ${feedback}. Please revise accordingly.`
+      : topic
+      ? `Today is ${TODAY}. The editor has a specific topic in mind for this issue: "${topic}". Build the Weekly Editorial Plan around this direction. Use your editorial judgment to find the strongest angle within this topic that fits The Meridian's lens — the geopolitics × travel perspective, the Indian audience, the depth and point of view. If the topic is a place currently unsafe for travel, treat it as an Emerging Destination story, not a Transformation Story.`
+      : `Today is ${TODAY}. Please generate the Weekly Editorial Plan for this week's issue of The Meridian.`;
+    await streamCall({
+      engine, system,
+      messages:[{role:'user',content:msg}],
+      onChunk: t => setCeoOutput(t),
+      onDone: t => {
+        setCeoStatus('complete');
+        const briefs = parseBriefs(t);
+        setApprovals(prev=>{
+          const next={...prev};
+          BRIEF_KEYS.forEach(k=>{ next[k]={text:briefs[k],approved:false,editing:false,editText:briefs[k]}; });
+          return next;
+        });
+      },
+      onStop:  t => { setCeoStatus('stopped'); setCeoOutput(t); },
+      onError: e => { setCeoStatus('error');   setCeoError(e); },
+      pauseRef, stopRef, maxTokens: AGENT_MAX_TOKENS.ceo,
+    });
+  };
+
+  const triggerAgent = (briefKey) => {
+    const agentKey = BRIEF_TO_AGENT[briefKey];
+    const depKey = AGENT_DEPS[agentKey];
+    if (!depKey || agents[depKey]?.status === 'complete') {
+      runAgent(agentKey);
+    } else {
+      setAgents(a => ({ ...a, [agentKey]: { ...a[agentKey], status: 'waiting' } }));
+    }
+  };
+
+  const handleApprove = k => {
+    setApprovals(a=>({...a,[k]:{...a[k],approved:true,editing:false}}));
+    triggerAgent(k);
+  };
+  const handleToggleEdit = (k,open) => setApprovals(a=>({...a,[k]:{...a[k],editing:open,editText:a[k].text}}));
+  const handleEditChange = (k,v) => setApprovals(a=>({...a,[k]:{...a[k],editText:v}}));
+  const handleApplyEdit = k => {
+    setApprovals(a=>({...a,[k]:{...a[k],text:a[k].editText,approved:true,editing:false}}));
+    triggerAgent(k);
+  };
+
+  const approveAllAndBegin = () => {
+    setApprovals(prev => {
+      const next = {...prev};
+      BRIEF_KEYS.forEach(k => { next[k] = {...next[k], approved:true, editing:false}; });
+      return next;
+    });
+    // Set all dependent agents to waiting (story, researcher, writer, editor)
+    setAgents(prev => {
+      const next = {...prev};
+      ['story','researcher','writer','editor'].forEach(k => {
+        if (next[k].status === 'locked') next[k] = {...next[k], status:'waiting'};
+      });
+      return next;
+    });
+    // Scout has no dependency — start immediately
+    if (agents.scout.status === 'locked' || agents.scout.status === 'waiting') {
+      runAgent('scout');
+    }
+  };
+
+  const runAgent = async (agentKey) => {
+    const bk = AGENT_TO_BRIEF[agentKey];
+    const brief = approvals[bk]?.text||'';
+    const sys = brief ? `YOUR CEO TASK BRIEF FOR THIS WEEK:\n\n${brief}\n\n---\n\n${AGENT_PROMPTS[agentKey]}` : AGENT_PROMPTS[agentKey];
+    const ai = AGENT_KEYS.indexOf(agentKey);
+    const prevOut = ai>0 ? agents[AGENT_KEYS[ai-1]].output : '';
+    const userMsgs = {
+      scout: `Today is ${TODAY}. Please produce the morning brief as per your task.`,
+      story: `Here is the Scout's daily brief:\n\n${prevOut}\n\nIdentify the best story and develop a full editorial pitch.`,
+      researcher: `Here is the editorial pitch:\n\n${prevOut}\n\nResearch this story thoroughly.`,
+      writer: `Here is the research brief:\n\n${prevOut}\n\nWrite the complete first draft.`,
+      editor: `Here is the first draft:\n\n${prevOut}\n\nPrepare the editor's report.`,
+    };
+    resetStream();
+    setAgents(a=>({...a,[agentKey]:{...a[agentKey],status:'running',output:'',error:''}}));
+    await streamCall({
+      engine, system:sys,
+      messages:[{role:'user',content:userMsgs[agentKey]}],
+      onChunk: t=>setAgents(a=>({...a,[agentKey]:{...a[agentKey],output:t}})),
+      onDone: t=>{
+        setAgents(prev=>({...prev,[agentKey]:{...prev[agentKey],status:'complete',output:t}}));
+      },
+      onStop: t=>setAgents(a=>({...a,[agentKey]:{...a[agentKey],status:'stopped',output:t}})),
+      onError: e=>setAgents(a=>({...a,[agentKey]:{...a[agentKey],status:'error',error:e}})),
+      pauseRef, stopRef, maxTokens: AGENT_MAX_TOKENS[agentKey],
+    });
+  };
+
+  const saveIssue = () => {
+    const headline = extractHeadline(agents.writer.output);
+    const storyType = extractStoryType(ceoOutput);
+    const issue = {id:Date.now(),date:TODAY,headline,storyType,ceoOutput,scout:agents.scout.output,story:agents.story.output,researcher:agents.researcher.output,writer:agents.writer.output,editor:agents.editor.output};
+    const updated = [issue,...archive];
+    setArchive(updated);
+    localStorage.setItem('meridian_archive',JSON.stringify(updated));
+    localStorage.removeItem('meridian_draft');
+    setIssueSaved(true);
+  };
+
+  const reset = () => {
+    setCeoStatus('idle'); setCeoOutput(''); setCeoError('');
+    setApprovals(initApprovals()); setAgents(initAgents());
+    setSendBack(''); setIssueSaved(false); setTopicInput('');
+    localStorage.removeItem('meridian_draft');
+    setSavedDraft(null);
+  };
+
+  if (!engine) return <ModelLoader onReady={onReady} />;
+
+  const shortModel = modelName.split('-').slice(0,3).join(' ');
+  const isComplete = agents.editor.status==='complete';
+
+  return (
+    <div className="app">
+      <div className="header">
+        <div className="logo">The <span>Meridian</span></div>
+        <div className="header-nav">
+          <div className="model-badge">
+            <div className="model-badge-dot" />
+            <span>{shortModel}</span>
+          </div>
+          <button className={`nav-btn${activeTab==='pipeline'?' active':''}`} onClick={()=>setActiveTab('pipeline')}>Pipeline</button>
+          <button className={`nav-btn${activeTab==='archive'?' active':''}`} onClick={()=>setActiveTab('archive')}>Archive ({archive.length})</button>
+          <button className="nav-btn" onClick={()=>setEngine(null)}>Change Model</button>
+        </div>
+      </div>
+
+      {activeTab==='archive' && <div style={{paddingTop:28}}><ArchiveView archive={archive} /></div>}
+
+      {activeTab==='pipeline' && (
+        <>
+          <PipelineBar ceoStatus={ceoStatus} allApproved={allApproved} agents={agents} />
+
+          {ceoStatus==='idle' && (
+            <div className="idle-screen">
+              <h1>The <em>Meridian</em><br/>Editorial Dashboard</h1>
+              <div className="idle-model-chip">Running {shortModel} — locally in your browser</div>
+
+              {/* Restore unsaved session */}
+              {savedDraft && (
+                <div style={{maxWidth:480,margin:'0 auto 28px',padding:'14px 18px',background:'var(--bg2)',border:'1px solid var(--amber3)',borderRadius:5,textAlign:'left'}}>
+                  <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--amber)',letterSpacing:'.1em',textTransform:'uppercase',marginBottom:8}}>
+                    ↩ Unsaved session found
+                  </div>
+                  <div style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--muted)',marginBottom:4}}>
+                    {new Date(savedDraft.timestamp).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}
+                  </div>
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                    {(['ceo',...AGENT_KEYS]).map(k=>{
+                      const st = k==='ceo' ? savedDraft.ceoStatus : savedDraft.agents?.[k]?.status;
+                      if (!st || st==='locked') return null;
+                      return (
+                        <span key={k} style={{fontFamily:'IBM Plex Mono',fontSize:9,padding:'2px 6px',borderRadius:2,
+                          background: st==='complete'?'var(--green2)':st==='stopped'?'var(--amber3)':st==='waiting'?'var(--bg3)':'var(--bg3)',
+                          color: st==='complete'?'var(--green)':st==='stopped'?'var(--amber)':'var(--muted)'}}>
+                          {k.toUpperCase()}: {st}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <div style={{display:'flex',gap:8}}>
+                    <button className="btn btn-amber btn-sm" onClick={restoreSession}>Resume session</button>
+                    <button className="btn btn-ghost btn-sm" onClick={discardDraft}>Discard</button>
+                  </div>
+                </div>
+              )}
+              <p>The CEO Agent plans this week's issue, briefs your team, and waits for your approval before anyone writes a word.</p>
+
+              {/* Recent history */}
+              {archive.length > 0 && (
+                <div style={{marginBottom:20,display:'inline-block',textAlign:'left',background:'var(--bg2)',border:'1px solid var(--border)',borderRadius:4,padding:'10px 16px',minWidth:340}}>
+                  <div style={{fontFamily:'IBM Plex Mono',fontSize:9,letterSpacing:'.1em',color:'var(--muted)',textTransform:'uppercase',marginBottom:8}}>Recent issues</div>
+                  {archive.slice(0,3).map(issue => {
+                    const tm = STORY_TYPE_META[issue.storyType] || STORY_TYPE_META.unknown;
+                    return (
+                      <div key={issue.id} style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                        <span style={{fontFamily:'IBM Plex Mono',fontSize:9,padding:'2px 6px',borderRadius:2,background:tm.bg,color:tm.color,whiteSpace:'nowrap'}}>
+                          {tm.label}
+                        </span>
+                        <span style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:220}}>{issue.headline}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Story type nudge */}
+              <div style={{marginBottom:24}}>
+                <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)',marginBottom:8,letterSpacing:'.06em'}}>Nudge the CEO toward (optional)</div>
+                <div style={{display:'flex',gap:6,justifyContent:'center',flexWrap:'wrap'}}>
+                  {[
+                    ['either',         'Either',         {color:'var(--text)',  bg:'var(--bg3)',  border:'var(--border2)'}],
+                    ['active',         'Active Geo',     STORY_TYPE_META.active],
+                    ['transformation', 'Transformation', STORY_TYPE_META.transformation],
+                    ['emerging',       'Emerging',       STORY_TYPE_META.emerging],
+                  ].map(([val, label, meta]) => (
+                    <button key={val} onClick={()=>setPreferredType(val)}
+                      className="btn btn-sm"
+                      style={{
+                        background: preferredType===val ? meta.bg : 'var(--bg2)',
+                        color: preferredType===val ? meta.color : 'var(--muted)',
+                        border: `1px solid ${preferredType===val ? meta.border : 'var(--border)'}`,
+                        textTransform:'none', letterSpacing:'normal', fontSize:11,
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Topic input */}
+              <div style={{maxWidth:480,margin:'0 auto 24px',textAlign:'left'}}>
+                <label style={{display:'block',fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)',letterSpacing:'.08em',textTransform:'uppercase',marginBottom:8}}>
+                  Give the CEO a topic or direction — optional
+                </label>
+                <textarea
+                  value={topicInput}
+                  onChange={e=>setTopicInput(e.target.value)}
+                  placeholder={"e.g. Vietnam's transformation from war to tourism\ne.g. How the Abraham Accords changed travel in the Middle East\ne.g. Georgia — the country, not the state\ne.g. Post-apartheid South Africa as a destination"}
+                  style={{width:'100%',padding:'10px 14px',fontSize:12,lineHeight:1.6,minHeight:90,resize:'vertical',borderRadius:4}}
+                />
+                {topicInput.trim() && (
+                  <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--amber2)',marginTop:6}}>
+                    ✓ CEO will build this week's plan around your topic
+                  </div>
+                )}
+              </div>
+
+              <button className="btn btn-amber" style={{padding:'14px 36px',fontSize:'12px'}} onClick={()=>startCEO(null)}>Start New Issue</button>
+            </div>
+          )}
+
+          {ceoStatus!=='idle' && (
+            <div className={`section-card${ceoStatus==='running'?' active':''}`} style={{marginTop:0}}>
+              <div className="section-header">
+                <div className="sh-left">
+                  <span className="sh-tag">Director</span>
+                  <span className="sh-title">CEO Agent</span>
+                </div>
+                <span className={`sh-status ${ceoStatus}`}>{ceoStatus}</span>
+              </div>
+              <div className="section-body">
+                {feedStatus==='fetching' && <LoadingDot text="Fetching live news feeds..." />}
+                {feedStatus==='done' && feedSources.length>0 && (
+                  <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--green)',marginBottom:12,display:'flex',alignItems:'center',gap:6}}>
+                    <span>✓</span>
+                    <span>Live feeds loaded: {feedSources.join(' · ')}</span>
+                  </div>
+                )}
+                {feedStatus==='failed' && (
+                  <div style={{marginBottom:16}}>
+                    <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--amber2)',marginBottom:10}}>
+                      ⚠ Could not fetch live news — CEO will use training knowledge only.
+                    </div>
+                    <div style={{fontFamily:'IBM Plex Mono',fontSize:10,color:'var(--muted)',marginBottom:6,letterSpacing:'.06em',textTransform:'uppercase'}}>
+                      Or paste headlines manually (optional)
+                    </div>
+                    <textarea
+                      id="manual-headlines"
+                      placeholder={"Paste any current headlines here — one per line\ne.g. India and Saudi Arabia sign new tourism agreement\ne.g. Myanmar junta restricts border crossings amid protests"}
+                      style={{width:'100%',padding:'10px 12px',fontFamily:'IBM Plex Mono',fontSize:11,lineHeight:1.6,minHeight:80,background:'var(--bg1)',color:'var(--text)',border:'1px solid var(--border2)',borderRadius:4,resize:'vertical',outline:'none'}}
+                    />
+                  </div>
+                )}
+                {(feedStatus==='done'||feedStatus==='failed') && ceoStatus==='running' && (
+                  <div className="stream-controls">
+                    <LoadingDot text={isPaused ? 'Paused...' : "CEO is planning this week's issue..."} />
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                      <ElapsedTimer running={ceoStatus==='running' && !isPaused} />
+                      {!isPaused
+                        ? <button className="btn btn-ghost btn-sm" onClick={pauseStream} style={{color:'var(--amber)'}}>⏸ Pause</button>
+                        : <button className="btn btn-amber btn-sm" onClick={resumeStream}>▶ Resume</button>}
+                      <button className="btn btn-ghost btn-sm" onClick={stopStream} style={{color:'var(--red)'}}>■ Stop</button>
+                    </div>
+                  </div>
+                )}
+                {ceoStatus==='stopped' && <p className="stopped-note">■ Stopped — partial output below. Click Regenerate to run again.</p>}
+                {ceoError && <div className="error-card"><p>{ceoError}</p><button className="btn btn-ghost btn-sm" onClick={()=>startCEO(null)}>Retry</button></div>}
+                {ceoOutput && <div className="output-area" ref={ceoRef}>{ceoOutput}</div>}
+                {ceoStatus==='stopped' && <div style={{marginTop:10}}><button className="btn btn-ghost btn-sm" onClick={()=>startCEO(null)}>Regenerate CEO Plan</button></div>}
+              </div>
+            </div>
+          )}
+
+          {ceoStatus==='complete' && (
+            <div className="approval-gate">
+              <div className="approval-gate-header">
+                <h3>Editorial Approval Gate</h3>
+                <span className="approval-counter">{allApproved?'✓ All approved — ready to begin':`${approvalCount} of 5 task briefs approved`}</span>
+              </div>
+              <div className="briefs-grid">
+                {BRIEF_KEYS.map(bk=>(
+                  <BriefCard key={bk} bkey={bk} approval={approvals[bk]}
+                    onApprove={handleApprove} onToggleEdit={handleToggleEdit}
+                    onEditChange={handleEditChange} onApplyEdit={handleApplyEdit} />
+                ))}
+              </div>
+              <div className="approve-all-row">
+                <div className="send-back-area">
+                  <label>Send back to CEO with feedback</label>
+                  <textarea value={sendBack} onChange={e=>setSendBack(e.target.value)} placeholder="Tell the CEO what's wrong with the plan and ask for a revision..." />
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:8,minWidth:196}}>
+                  <button className="btn btn-amber" style={{padding:'12px 20px'}} onClick={approveAllAndBegin}>
+                    {allApproved?'Approve All & Begin ↓':`Approve All & Begin (${approvalCount}/5)`}
+                  </button>
+                  <button className="btn btn-ghost" disabled={!sendBack.trim()} onClick={()=>{setSendBack('');startCEO(sendBack);}}>
+                    Send Back to CEO
+                  </button>
+                  <button className="btn btn-ghost btn-sm" onClick={reset}>Start Over</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {AGENT_KEYS.map(key=>(
+            <AgentSection key={key} agentKey={key}
+              brief={approvals[AGENT_TO_BRIEF[key]]?.text||''}
+              status={agents[key].status}
+              output={agents[key].output}
+              error={agents[key].error}
+              isPaused={isPaused}
+              onRun={()=>runAgent(key)}
+              onRegen={()=>runAgent(key)}
+              onPause={pauseStream}
+              onResume={resumeStream}
+              onStopStream={stopStream} />
+          ))}
+
+          {isComplete && (
+            <div className="complete-banner">
+              <p>✓ Issue complete — all 5 stages done.</p>
+              <div style={{display:'flex',gap:8}}>
+                {!issueSaved
+                  ? <button className="btn btn-green btn-sm" onClick={saveIssue}>Save to Archive</button>
+                  : <span style={{fontFamily:'IBM Plex Mono',fontSize:11,color:'var(--green)'}}>✓ Saved</span>}
+                <button className="btn btn-ghost btn-sm" onClick={reset}>New Issue</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
