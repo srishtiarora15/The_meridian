@@ -11,9 +11,16 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin=""></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="module">
-  import * as WebLLM from "https://esm.run/@mlc-ai/web-llm";
-  window._WebLLM = WebLLM;
-  document.dispatchEvent(new CustomEvent('webllm-ready'));
+  (async () => {
+    try {
+      const WebLLM = await import("https://esm.run/@mlc-ai/web-llm");
+      window._WebLLM = WebLLM;
+      window._WebLLMReady = true;
+    } catch(e) {
+      console.error('WebLLM load failed:', e);
+      window._WebLLMReady = false;
+    }
+  })();
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -310,14 +317,14 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [msg, setMsg] = useState('');
-    const [libReady, setLibReady] = useState(!!window._WebLLM);
+    const [libReady, setLibReady] = useState(!!window._WebLLMReady);
 
     useEffect(() => {
-      if (!window._WebLLM) {
-        const h = () => setLibReady(true);
-        document.addEventListener('webllm-ready', h, { once: true });
-        return () => document.removeEventListener('webllm-ready', h);
-      }
+      if (window._WebLLMReady) return;
+      const poll = setInterval(() => {
+        if (window._WebLLMReady) { setLibReady(true); clearInterval(poll); }
+      }, 100);
+      return () => clearInterval(poll);
     }, []);
 
     const load = async () => {
