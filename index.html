@@ -11,9 +11,15 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin=""></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script type="module">
-  import * as WebLLM from "https://esm.run/@mlc-ai/web-llm";
-  window._WebLLM = WebLLM;
-  window._WebLLMReady = true;
+  (async () => {
+    try {
+      const WebLLM = await import("https://esm.run/@mlc-ai/web-llm");
+      window._WebLLM = WebLLM;
+      console.log('WebLLM loaded successfully');
+    } catch(e) {
+      console.error('WebLLM load failed:', e);
+    }
+  })();
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -310,18 +316,24 @@ function App() {
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [msg, setMsg] = useState('');
-    const [libReady, setLibReady] = useState(!!window._WebLLMReady);
+    const [libReady, setLibReady] = useState(!!window._WebLLM);
 
     useEffect(() => {
-      if (!!window._WebLLMReady) { setLibReady(true); return; }
+      if (window._WebLLM) { setLibReady(true); return; }
       const poll = setInterval(() => {
-        if (window._WebLLMReady) { setLibReady(true); clearInterval(poll); }
+        if (window._WebLLM) { setLibReady(true); clearInterval(poll); }
       }, 200);
-      return () => clearInterval(poll);
+      const timeout = setTimeout(() => clearInterval(poll), 15000);
+      return () => { clearInterval(poll); clearTimeout(timeout); };
     }, []);
 
     const load = async () => {
+      if (!window._WebLLM) {
+        alert('WebLLM not loaded yet. Please wait a moment and refresh.');
+        return;
+      }
       setLoading(true);
+      setMsg('Loading from cache...');
       try {
         const eng = new window._WebLLM.MLCEngine();
         await eng.reload(selected, {
